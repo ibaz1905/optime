@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optime!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        
+        /* Completely Custom Sleek Cursors */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            overflow-x: hidden; 
+            display: flex; 
+            flex-direction: column; 
+            min-height: 100vh;
+            /* Default sleek black cursor */
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='%230f172a' stroke='white' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M4 4 L19 10 L12 12 L10 19 Z'/%3E%3C/svg%3E") 4 4, auto; 
+        }
+        
+        /* Indigo colored cursor for clickable elements */
+        button, a, label, .cursor-pointer, .tooltip-trigger,
+        button *, a *, label *, .cursor-pointer *, .tooltip-trigger * {
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='%234f46e5' stroke='white' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M4 4 L19 10 L12 12 L10 19 Z'/%3E%3C/svg%3E") 4 4, pointer !important;
+        }
+        
+        /* Custom indigo text cursor (I-beam) and blinking caret for typing */
+        input, textarea, input *, textarea * {
+            cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cg stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4 L12 20 M9 4 L15 4 M9 20 L15 20'/%3E%3C/g%3E%3Cg stroke='%234f46e5' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 4 L12 20 M9 4 L15 4 M9 20 L15 20'/%3E%3C/g%3E%3C/svg%3E") 12 12, text !important;
+            caret-color: #4f46e5 !important;
+        }
+
+        .main-content-wrapper { flex-grow: 1; }
+        .correct-flash { animation: correct 0.5s ease; }
+        .wrong-flash { animation: wrong 0.5s ease; }
+        @keyframes correct {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: #dcfce7; }
+        }
+        @keyframes wrong {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: #fee2e2; }
+        }
+        .sidebar-scroll { max-height: 500px; overflow-y: auto; scrollbar-width: thin; }
+        kbd { font-family: monospace; }
+        .list-item { animation: slideIn 0.3s ease-out; transition: filter 0.3s ease, opacity 0.3s ease; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .blurred { filter: blur(10px) grayscale(1); opacity: 0.3; pointer-events: none; }
+        
+        /* Toggle Switch Styling */
+        .dot { transition: all 0.3s ease-in-out; }
+        input:checked ~ .dot { transform: translateX(100%); background-color: #4f46e5; }
+        input:checked ~ .block { background-color: #e0e7ff; }
+
+        /* Smooth Tooltip */
+        #custom-tooltip {
+            position: fixed;
+            pointer-events: none;
+            z-index: 100;
+            background: #1e293b;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            transition: opacity 0.2s ease;
+            max-width: 220px;
+        }
+
+        /* Test Mode Hiding */
+        .test-mode-active .sidebar-container { display: none; }
+        .test-mode-active .main-container { grid-column: span 4 / span 4; max-width: 28rem; margin: 0 auto; }
+        .test-mode-active #view-settings-btn,
+        .test-mode-active #score-counter { display: none !important; }
+
+        /* Custom Modal Styling */
+        #modal-overlay {
+            backdrop-filter: blur(4px);
+            transition: all 0.3s ease;
+        }
+
+        /* Custom Scrollbar for Editor */
+        .editor-scroll::-webkit-scrollbar { width: 6px; }
+        .editor-scroll::-webkit-scrollbar-track { background: transparent; }
+        .editor-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        
+        /* Auto-resizing textarea resets */
+        textarea { outline: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 transition-all duration-500" id="app-body">
+
+    <div id="custom-tooltip" class="hidden opacity-0"></div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="fixed inset-0 bg-slate-900/40 z-[200] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full shadow-2xl animate-in zoom-in duration-200">
+            <h3 id="modal-title" class="text-xl font-black text-slate-800 mb-4 italic">Confirmation</h3>
+            <p id="modal-body" class="text-slate-500 text-sm mb-8 leading-relaxed"></p>
+            <div class="flex gap-3">
+                <button id="modal-cancel" class="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
+                <button id="modal-confirm" class="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 transition-colors shadow-lg">Proceed</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-content-wrapper p-4 md:p-8">
+        <!-- ==================== VIEW: HOME ==================== -->
+        <div id="home-view" class="max-w-2xl mx-auto mt-12 animate-in fade-in zoom-in duration-500">
+            <div class="text-center mb-12">
+                <h1 class="text-5xl font-black text-slate-800 mb-4 italic tracking-tight">Optime!</h1>
+                <p class="text-slate-500">Create a custom flashcard set or import an existing one to begin.</p>
+            </div>
+            <div class="grid md:grid-cols-2 gap-6">
+                <button onclick="showCreateView()" class="group bg-white p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-slate-100 text-left active:scale-95">
+                    <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /></svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2">Create Set</h2>
+                    <p class="text-sm text-slate-500">Manually input your terms and up to 5 definitions each.</p>
+                </button>
+                
+                <button onclick="showImportView()" class="group bg-white p-8 rounded-3xl shadow-xl hover:shadow-2xl transition-all border border-slate-100 text-left active:scale-95">
+                    <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    </div>
+                    <h2 class="text-2xl font-bold text-slate-800 mb-2">Import Set</h2>
+                    <p class="text-sm text-slate-500">Paste set data generated from a previous session to resume.</p>
+                </button>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW: IMPORT ==================== -->
+        <div id="import-view" class="hidden max-w-2xl mx-auto mt-12 animate-in fade-in zoom-in duration-300">
+            <div class="bg-white p-8 rounded-3xl shadow-xl border border-slate-100">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-3xl font-black text-slate-800 italic">Import Deck</h2>
+                    <button onclick="showHomeView()" class="text-sm font-bold text-slate-400 hover:text-slate-600">Back</button>
+                </div>
+                <p class="text-sm text-slate-500 mb-4">Paste the JSON text from a previously downloaded set, or upload a file.</p>
+                <textarea id="import-textarea" class="w-full h-48 p-4 rounded-xl border-2 border-slate-100 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:outline-none text-sm font-monospace resize-none mb-4" placeholder='{"title": "My Set", "words": [...] }'></textarea>
+                
+                <div class="flex items-center gap-4 mb-6">
+                    <div class="h-px bg-slate-200 flex-1"></div>
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">OR</span>
+                    <div class="h-px bg-slate-200 flex-1"></div>
+                </div>
+
+                <div class="flex gap-4">
+                    <label class="cursor-pointer flex-1 bg-slate-100 text-slate-600 font-bold py-4 rounded-2xl hover:bg-slate-200 transition-all text-center border-2 border-dashed border-slate-300 hover:border-slate-400 flex items-center justify-center">
+                        <span>Upload .json File</span>
+                        <input type="file" class="hidden" accept=".json" onchange="handleFileUpload(event)">
+                    </label>
+                    <button onclick="processImport()" class="flex-1 bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-indigo-700 transition-all">Load Text & Start</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== VIEW: CREATE/EDIT ==================== -->
+        <div id="create-view" class="hidden max-w-4xl mx-auto mt-6 animate-in fade-in zoom-in duration-300">
+            <div class="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 flex flex-col h-[85vh]">
+                
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 shrink-0">
+                    <div class="flex-1 min-w-0">
+                        <input type="text" id="set-title-input" maxlength="60" class="w-full text-3xl font-black text-slate-800 italic border-b-2 border-transparent hover:border-slate-200 focus:border-indigo-500 focus:outline-none transition-colors px-2 py-1 bg-transparent truncate" placeholder="Untitled Set">
+                    </div>
+                    <div class="flex gap-2 md:gap-4 shrink-0 items-center flex-wrap">
+                        <button onclick="copyCurrentSet()" class="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg> Copy JSON
+                        </button>
+                        <button onclick="downloadCurrentSet()" class="px-4 py-2 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200 transition-colors text-sm flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg> Download
+                        </button>
+                        <button id="cancel-edit-btn" onclick="cancelEdit()" class="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors px-2">Back</button>
+                        <button onclick="saveAndStart()" class="px-6 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow hover:bg-indigo-700 transition-colors text-sm">Save & Start</button>
+                    </div>
+                </div>
+
+                <!-- Header Row for Terms -->
+                <div class="grid grid-cols-12 gap-4 px-4 pb-2 text-xs font-bold text-slate-400 uppercase tracking-widest shrink-0 border-b border-slate-100">
+                    <div class="col-span-3">Term</div>
+                    <div class="col-span-8">Definitions (Up to 5)</div>
+                    <div class="col-span-1 text-center">Action</div>
+                </div>
+
+                <!-- Dynamic Rows -->
+                <div id="editor-rows" class="flex-1 overflow-y-auto editor-scroll p-2 space-y-3 mt-4">
+                    <!-- Rows injected via JS -->
+                </div>
+
+                <div class="pt-6 mt-2 border-t border-slate-100 shrink-0">
+                    <button onclick="addEditorRow()" class="w-full py-4 border-2 border-dashed border-slate-200 text-slate-500 font-bold rounded-2xl hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                        Add Term
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ==================== VIEW: TRAINING APP ==================== -->
+        <div id="training-view" class="hidden max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-6 animate-in fade-in duration-500">
+            
+            <!-- Left Sidebar: Missed -->
+            <div class="md:col-span-1 order-2 md:order-1 sidebar-container">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xs font-bold text-red-500 uppercase tracking-widest flex items-center">
+                        <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span> Missed
+                    </h2>
+                    <span id="missed-count" class="text-[10px] font-bold text-red-400 bg-red-50 px-2 py-0.5 rounded">0</span>
+                </div>
+                <div id="missed-list" class="sidebar-scroll space-y-2 pr-2"></div>
+            </div>
+
+            <!-- Main Game Area -->
+            <div class="md:col-span-2 order-1 md:order-2 main-container">
+                <div id="game-card" class="bg-white p-8 rounded-3xl shadow-xl transition-all duration-300 border border-slate-100">
+                    
+                    <!-- Header -->
+                    <div class="text-center mb-6 border-b border-slate-100 pb-4 px-4 w-full">
+                        <h2 id="active-set-title" class="text-xl font-bold text-slate-700 truncate tooltip-trigger cursor-default" data-tip="Set Title">Set Title</h2>
+                    </div>
+
+                    <div class="flex justify-between items-center mb-10">
+                        <div class="flex flex-col gap-1 text-center min-w-[80px]">
+                            <span id="mode-badge" class="px-3 py-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase rounded-full tracking-wider">Practice Mode</span>
+                            <span id="streak-display" class="text-[10px] font-black text-orange-500 uppercase tracking-widest hidden">Streak: 0</span>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <button id="view-settings-btn" class="text-[10px] font-bold uppercase text-slate-400 hover:text-indigo-600 transition-colors flex items-center gap-1 group">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 group-hover:rotate-45 transition-transform" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                                </svg>
+                                <span id="settings-btn-label">Settings</span>
+                            </button>
+                            <span id="score-counter" class="text-sm font-bold text-slate-600 tracking-tight">Accuracy: 0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Quiz Interface -->
+                    <div id="quiz-ui">
+                        <div class="text-center mb-10">
+                            <h1 id="term-display" class="text-5xl font-black text-slate-800 mb-3 tracking-tight italic break-words">...</h1>
+                            <p id="instruction-text" class="text-slate-400 text-sm font-medium">Translate to English</p>
+                        </div>
+
+                        <div class="space-y-4">
+                            <textarea id="answer-input" autocomplete="off" rows="1" oninput="autoResize(this)"
+                                class="w-full p-5 border-2 border-slate-100 bg-slate-50 rounded-2xl focus:border-indigo-500 focus:bg-white focus:outline-none text-center text-xl font-semibold transition-all resize-none overflow-hidden"
+                                placeholder="Type meaning..."></textarea>
+                            
+                            <button id="submit-btn" class="w-full bg-slate-900 hover:bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2">
+                                <span id="btn-text">Check Answer</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 1.414L10.586 9H7a1 1 0 100 2h3.586l-1.293 1.293a1 1 0 101.414 1.414l3-3a1 1 0 000-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div id="feedback" class="mt-6 text-center min-h-[1.5rem] font-bold text-sm transition-opacity duration-300 opacity-0">
+                            Correct!
+                        </div>
+                    </div>
+
+                    <!-- End Screen Interface -->
+                    <div id="end-ui" class="hidden w-full max-w-lg mx-auto animate-in fade-in slide-in-from-top-4 duration-500 text-center py-6">
+                        <h2 class="text-4xl font-black text-slate-800 italic mb-2">Optime!</h2>
+                        <div id="end-message" class="text-slate-500 font-medium mb-6">You've reached the end of the session.</div>
+                        
+                        <!-- Dynamic container for Test Mode mistakes -->
+                        <div id="test-mistakes-container" class="hidden text-left mb-8 max-h-64 overflow-y-auto editor-scroll border border-slate-100 rounded-xl p-4 bg-slate-50">
+                            <!-- Mistakes injected here -->
+                        </div>
+
+                        <div class="flex flex-col gap-4 max-w-xs mx-auto">
+                            <button id="end-settings-btn" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-indigo-700 transition-all">Settings</button>
+                            <button onclick="initDeck()" class="w-full bg-slate-100 text-slate-600 font-bold py-4 rounded-2xl hover:bg-slate-200 transition-all">Restart Session</button>
+                        </div>
+                    </div>
+
+                    <!-- Settings Dashboard -->
+                    <div id="stats-ui" class="hidden animate-in fade-in zoom-in duration-300">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <h2 class="text-3xl font-black text-slate-800 italic">Settings</h2>
+                                <p id="high-streak-display" class="text-orange-500 font-black text-[10px] uppercase tracking-widest mt-1">Highest Streak: 0</p>
+                            </div>
+                            <div class="text-right flex flex-col items-end gap-3">
+                                 <button id="close-stats-btn" class="hidden text-xs font-bold text-indigo-600 hover:underline">Return</button>
+                                 
+                                 <!-- Endless Toggle -->
+                                 <div class="tooltip-trigger" data-tip="Endless Mode: Continues forever randomly. Tracks streaks. Resets on miss.">
+                                    <label for="endless-toggle" class="flex items-center cursor-pointer gap-2 justify-end">
+                                        <span class="text-[10px] font-bold uppercase text-slate-400">Endless Mode</span>
+                                        <div class="relative">
+                                            <input type="checkbox" id="endless-toggle" class="sr-only">
+                                            <div class="block bg-slate-100 w-8 h-5 rounded-full border border-slate-200"></div>
+                                            <div class="dot absolute left-1 top-1 bg-slate-400 w-3 h-3 rounded-full transition shadow-sm"></div>
+                                        </div>
+                                    </label>
+                                 </div>
+
+                                 <!-- Test Mode Toggle -->
+                                 <div class="tooltip-trigger" data-tip="Test Mode: Silence feedback, hide sidebars, lock session. Final score revealed at end.">
+                                    <label for="test-mode-toggle" class="flex items-center cursor-pointer gap-2 justify-end">
+                                        <span class="text-[10px] font-bold uppercase text-slate-400">Test Mode</span>
+                                        <div class="relative">
+                                            <input type="checkbox" id="test-mode-toggle" class="sr-only">
+                                            <div class="block bg-slate-100 w-8 h-5 rounded-full border border-slate-200"></div>
+                                            <div class="dot absolute left-1 top-1 bg-slate-400 w-3 h-3 rounded-full transition shadow-sm"></div>
+                                        </div>
+                                    </label>
+                                 </div>
+
+                                 <!-- Lock Toggle -->
+                                 <div class="tooltip-trigger" data-tip="Lock Session: Disables manual restarts until the whole list is complete.">
+                                    <label for="lock-toggle" class="flex items-center cursor-pointer gap-2 justify-end">
+                                        <span class="text-[10px] font-bold uppercase text-slate-400">Lock Session</span>
+                                        <div class="relative">
+                                            <input type="checkbox" id="lock-toggle" class="sr-only">
+                                            <div class="block bg-slate-100 w-8 h-5 rounded-full border border-slate-200"></div>
+                                            <div class="dot absolute left-1 top-1 bg-slate-400 w-3 h-3 rounded-full transition shadow-sm flex items-center justify-center">
+                                                <svg id="lock-icon" xmlns="http://www.w3.org/2000/svg" class="h-2 w-2 text-white hidden" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd" />
+                                                </svg>
+                                            </div>
+                                        </div>
+                                    </label>
+                                 </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Stats Table -->
+                        <div class="overflow-x-auto border-t border-slate-50 pt-4">
+                            <table class="w-full text-left text-xs">
+                                <thead>
+                                    <tr class="text-slate-400 border-b border-slate-50 uppercase tracking-tighter">
+                                        <th class="pb-2">Term</th>
+                                        <th class="pb-2 text-center">Hits</th>
+                                        <th class="pb-2 text-center">Miss</th>
+                                        <th class="pb-2 text-right">Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="stats-table-body" class="text-slate-600"></tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Settings Buttons -->
+                        <div class="mt-6 flex flex-col gap-3">
+                            <button onclick="openEditorFromSettings()" class="w-full py-4 border-2 border-indigo-100 text-indigo-600 font-bold rounded-2xl hover:bg-indigo-50 transition-colors">Edit Current List</button>
+                            
+                            <div class="flex gap-3">
+                                <button id="restart-btn" class="flex-1 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-indigo-600 transition-colors shadow-lg disabled:opacity-30 disabled:hover:bg-slate-900 disabled:cursor-not-allowed">Restart Deck</button>
+                                <button id="clear-stats-btn" class="px-6 py-4 border-2 border-red-50 text-red-400 font-bold rounded-2xl hover:border-red-100 hover:text-red-600 transition-all">Clear Stats</button>
+                            </div>
+                            <button onclick="showHomeView()" class="mt-2 text-xs font-bold text-slate-400 hover:text-slate-600 underline text-center block w-full">Exit to Main Menu</button>
+                        </div>
+                        <p id="lock-notice" class="text-[10px] text-center mt-3 text-amber-500 font-bold uppercase hidden italic tracking-widest">Restart locked until session complete</p>
+                    </div>
+
+                    <div class="mt-10 pt-6 border-t border-slate-50 flex justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        <div class="flex items-center gap-2">
+                            <kbd class="px-1.5 py-0.5 bg-white border border-slate-200 shadow-sm rounded">ENTER</kbd>
+                            <span>to submit</span>
+                        </div>
+                        <p id="progress-text">Word 1/X</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Sidebar: Mastered -->
+            <div class="md:col-span-1 order-3 sidebar-container">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xs font-bold text-green-500 uppercase tracking-widest flex items-center">
+                        <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span> Mastered
+                    </h2>
+                    <span id="mastered-count" class="text-[10px] font-bold text-green-400 bg-green-50 px-2 py-0.5 rounded">0</span>
+                </div>
+                <div id="mastered-list" class="sidebar-scroll space-y-2 pr-2"></div>
+            </div>
+
+        </div>
+    </div>
+    
+    <footer class="text-center py-6 text-slate-400 text-xs font-semibold tracking-wider mt-auto border-t border-slate-200 w-full shrink-0 bg-slate-50">
+        isaac.bazlov.uk
+    </footer>
+
+    <script>
+        // --- Data Structure & Persistence ---
+        const STATS_KEY = 'flashcard_trainer_persistent_stats_v3';
+        let pooledStats = JSON.parse(localStorage.getItem(STATS_KEY)) || { verbs: {}, highestStreak: 0 };
+        
+        let currentSet = {
+            title: "My Custom Set",
+            words: []
+        };
+
+        function saveStats() {
+            localStorage.setItem(STATS_KEY, JSON.stringify(pooledStats));
+        }
+
+        function recordAttempt(term, isCorrect, streak) {
+            if (!pooledStats.verbs[term]) {
+                pooledStats.verbs[term] = { correct: 0, incorrect: 0 };
+            }
+            if (isCorrect) pooledStats.verbs[term].correct++;
+            else pooledStats.verbs[term].incorrect++;
+            
+            if (streak > (pooledStats.highestStreak || 0)) {
+                pooledStats.highestStreak = streak;
+            }
+            saveStats();
+        }
+
+        // --- UI View Management ---
+        const views = {
+            home: document.getElementById('home-view'),
+            create: document.getElementById('create-view'),
+            import: document.getElementById('import-view'),
+            training: document.getElementById('training-view')
+        };
+
+        function hideAllViews() {
+            Object.values(views).forEach(v => v.classList.add('hidden'));
+        }
+
+        function showHomeView() {
+            hideAllViews();
+            views.home.classList.remove('hidden');
+        }
+
+        function showImportView() {
+            hideAllViews();
+            document.getElementById('import-textarea').value = '';
+            views.import.classList.remove('hidden');
+        }
+
+        let isEditingSet = false;
+
+        function showCreateView(isEditing = false) {
+            isEditingSet = isEditing;
+            hideAllViews();
+            views.create.classList.remove('hidden');
+            
+            if (isEditing) {
+                document.getElementById('cancel-edit-btn').innerText = "Cancel";
+                populateEditorWithCurrentSet();
+            } else {
+                document.getElementById('cancel-edit-btn').innerText = "Back";
+                // Fresh start
+                document.getElementById('set-title-input').value = "";
+                document.getElementById('editor-rows').innerHTML = "";
+                addEditorRow(); // Add one blank row
+            }
+        }
+
+        function showTrainingView() {
+            hideAllViews();
+            views.training.classList.remove('hidden');
+            const titleEl = document.getElementById('active-set-title');
+            titleEl.innerText = currentSet.title || "Untitled Set";
+            titleEl.setAttribute('data-tip', currentSet.title || "Untitled Set"); // Used for tooltip
+            titleEl.removeAttribute('title'); // Remove native tooltip
+            initDeck();
+        }
+
+        // --- Create / Edit Logic & Dynamic Textareas ---
+        function autoResize(element) {
+            element.style.height = 'auto';
+            element.style.height = element.scrollHeight + 'px';
+        }
+
+        function updateRowLayout(element) {
+            const container = element.closest('.def-container');
+            const defs = Array.from(container.querySelectorAll('textarea'));
+            
+            let lastFilledIndex = -1;
+            defs.forEach((def, index) => {
+                if (!def.classList.contains('hidden')) autoResize(def);
+                if (def.value.trim() !== '') {
+                    lastFilledIndex = index;
+                }
+            });
+
+            // Calculate how many textareas should be visible
+            const visibleCount = Math.min(5, Math.max(2, lastFilledIndex + 2));
+
+            defs.forEach((def, index) => {
+                if (index < visibleCount) {
+                    def.classList.remove('hidden');
+                    autoResize(def); // Ensure newly visible boxes have correct height
+
+                    // The last visible box (which is currently empty) gets a smaller flex basis
+                    if (index === visibleCount - 1 && def.value.trim() === '') {
+                        def.style.flex = "1 1 0%";
+                    } else {
+                        // All filled boxes get an equal, larger flex basis
+                        def.style.flex = "3 1 0%";
+                    }
+                } else {
+                    def.classList.add('hidden');
+                    def.value = ""; // Clear out if it gets hidden
+                }
+            });
+        }
+
+        function createRowHTML(term = '', m1='', m2='', m3='', m4='', m5='') {
+            return `
+                <div class="editor-row grid grid-cols-12 gap-3 items-start bg-slate-50 p-3 rounded-xl border border-slate-100 relative group">
+                    <div class="col-span-12 md:col-span-3">
+                        <textarea class="row-term w-full p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:outline-none text-sm font-bold text-slate-800 resize-none overflow-hidden transition-all" placeholder="Term (e.g. sum)" rows="1" oninput="autoResize(this)">${term}</textarea>
+                    </div>
+                    <div class="col-span-12 md:col-span-8 flex gap-2 def-container transition-all">
+                        <textarea class="row-m1 p-2 rounded-lg border border-slate-200 focus:border-indigo-500 focus:outline-none text-sm bg-white resize-none overflow-hidden transition-all duration-300" placeholder="Def 1 (req)" rows="1" oninput="updateRowLayout(this)">${m1}</textarea>
+                        <textarea class="row-m2 p-2 rounded-lg border border-transparent focus:border-indigo-500 focus:outline-none text-sm bg-transparent hover:bg-white resize-none overflow-hidden transition-all duration-300" placeholder="Def 2" rows="1" oninput="updateRowLayout(this)">${m2}</textarea>
+                        <textarea class="row-m3 p-2 rounded-lg border border-transparent focus:border-indigo-500 focus:outline-none text-sm bg-transparent hover:bg-white resize-none overflow-hidden transition-all duration-300 hidden" placeholder="Def 3" rows="1" oninput="updateRowLayout(this)">${m3}</textarea>
+                        <textarea class="row-m4 p-2 rounded-lg border border-transparent focus:border-indigo-500 focus:outline-none text-sm bg-transparent hover:bg-white resize-none overflow-hidden transition-all duration-300 hidden" placeholder="Def 4" rows="1" oninput="updateRowLayout(this)">${m4}</textarea>
+                        <textarea class="row-m5 p-2 rounded-lg border border-transparent focus:border-indigo-500 focus:outline-none text-sm bg-transparent hover:bg-white resize-none overflow-hidden transition-all duration-300 hidden" placeholder="Def 5" rows="1" oninput="updateRowLayout(this)">${m5}</textarea>
+                    </div>
+                    <div class="col-span-12 md:col-span-1 flex justify-center items-center h-full">
+                        <button onclick="this.closest('.editor-row').remove()" class="text-slate-300 hover:text-red-500 transition-colors p-2 mt-1" title="Remove Term">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function addEditorRow() {
+            const rows = document.getElementById('editor-rows');
+            rows.insertAdjacentHTML('beforeend', createRowHTML());
+            const newRow = rows.lastElementChild;
+            updateRowLayout(newRow.querySelector('.row-m1'));
+            rows.scrollTop = rows.scrollHeight;
+        }
+
+        function populateEditorWithCurrentSet() {
+            document.getElementById('set-title-input').value = currentSet.title || "";
+            const rowsContainer = document.getElementById('editor-rows');
+            rowsContainer.innerHTML = "";
+            currentSet.words.forEach(w => {
+                rowsContainer.insertAdjacentHTML('beforeend', createRowHTML(
+                    w.term, 
+                    w.meanings[0] || '', 
+                    w.meanings[1] || '', 
+                    w.meanings[2] || '', 
+                    w.meanings[3] || '', 
+                    w.meanings[4] || ''
+                ));
+            });
+            
+            if(currentSet.words.length === 0) {
+                addEditorRow();
+            } else {
+                // Initialize layouts for loaded rows
+                document.querySelectorAll('.editor-row').forEach(row => {
+                    updateRowLayout(row.querySelector('.row-m1'));
+                    autoResize(row.querySelector('.row-term'));
+                });
+            }
+        }
+
+        function cancelEdit() {
+            if (isEditingSet) {
+                showTrainingView();
+            } else {
+                showHomeView();
+            }
+        }
+
+        function saveAndStart() {
+            const title = document.getElementById('set-title-input').value.trim() || "Untitled Set";
+            const rows = document.querySelectorAll('.editor-row');
+            const newWords = [];
+
+            rows.forEach(row => {
+                const term = row.querySelector('.row-term').value.trim();
+                const m1 = row.querySelector('.row-m1').value.trim().toLowerCase();
+                const m2 = row.querySelector('.row-m2').value.trim().toLowerCase();
+                const m3 = row.querySelector('.row-m3').value.trim().toLowerCase();
+                const m4 = row.querySelector('.row-m4').value.trim().toLowerCase();
+                const m5 = row.querySelector('.row-m5').value.trim().toLowerCase();
+
+                if (term && m1) {
+                    const meanings = [m1, m2, m3, m4, m5].filter(m => m !== "");
+                    newWords.push({ term, meanings });
+                }
+            });
+
+            if (newWords.length < 2) {
+                showModal("Error", "You must have at least two valid terms and definitions to start.", () => {});
+                return;
+            }
+
+            currentSet = { title, words: newWords };
+            showTrainingView();
+        }
+
+        // --- Import / Export ---
+        function copyCurrentSet() {
+            const title = document.getElementById('set-title-input').value.trim() || "Untitled Set";
+            const rows = document.querySelectorAll('.editor-row');
+            const tempWords = [];
+            rows.forEach(row => {
+                const term = row.querySelector('.row-term').value.trim();
+                const meanings = [
+                    row.querySelector('.row-m1').value.trim(),
+                    row.querySelector('.row-m2').value.trim(),
+                    row.querySelector('.row-m3').value.trim(),
+                    row.querySelector('.row-m4').value.trim(),
+                    row.querySelector('.row-m5').value.trim()
+                ].filter(m => m !== "").map(m => m.toLowerCase());
+                if (term && meanings.length > 0) tempWords.push({ term, meanings });
+            });
+
+            const exportObj = { title, words: tempWords };
+            const dataStr = JSON.stringify(exportObj, null, 2);
+            
+            const tempTextArea = document.createElement("textarea");
+            tempTextArea.value = dataStr;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            try {
+                document.execCommand('copy');
+                showModal("Success!", "Set data copied to clipboard.", () => {});
+            } catch (err) {
+                showModal("Error", "Failed to copy to clipboard.", () => {});
+            }
+            document.body.removeChild(tempTextArea);
+        }
+
+        function downloadCurrentSet() {
+            const title = document.getElementById('set-title-input').value.trim() || "Untitled Set";
+            const rows = document.querySelectorAll('.editor-row');
+            const tempWords = [];
+            rows.forEach(row => {
+                const term = row.querySelector('.row-term').value.trim();
+                const meanings = [
+                    row.querySelector('.row-m1').value.trim(),
+                    row.querySelector('.row-m2').value.trim(),
+                    row.querySelector('.row-m3').value.trim(),
+                    row.querySelector('.row-m4').value.trim(),
+                    row.querySelector('.row-m5').value.trim()
+                ].filter(m => m !== "").map(m => m.toLowerCase());
+                if (term && meanings.length > 0) tempWords.push({ term, meanings });
+            });
+
+            const exportObj = { title, words: tempWords };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObj, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `${title.replace(/\s+/g, '_')}_flashcards.json`);
+            dlAnchorElem.click();
+        }
+
+        function processImport() {
+            try {
+                const text = document.getElementById('import-textarea').value;
+                const parsed = JSON.parse(text);
+                
+                if (!parsed.words || !Array.isArray(parsed.words) || parsed.words.length === 0) {
+                    throw new Error("Invalid format. Must contain a 'words' array.");
+                }
+
+                const validWords = parsed.words.filter(w => w.term && w.meanings && w.meanings.length > 0);
+                if (validWords.length < 2) throw new Error("A set must contain at least 2 valid terms.");
+
+                currentSet = {
+                    title: parsed.title || "Imported Set",
+                    words: validWords
+                };
+
+                showTrainingView();
+            } catch (e) {
+                showModal("Import Error", "Could not read data. Ensure it is valid JSON exported from this app. \n\n" + e.message, () => {});
+            }
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (!parsed.words || !Array.isArray(parsed.words)) {
+                        throw new Error("Invalid format. Must contain a 'words' array.");
+                    }
+                    const validWords = parsed.words.filter(w => w.term && w.meanings && w.meanings.length > 0);
+                    if (validWords.length < 2) throw new Error("A set must contain at least 2 valid terms.");
+                    
+                    currentSet = {
+                        title: parsed.title || "Imported Set",
+                        words: validWords
+                    };
+                    showTrainingView();
+                } catch (err) {
+                    showModal("Import Error", "Could not read data. Ensure it is a valid JSON exported from this app. \n\n" + err.message, () => {});
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        function openEditorFromSettings() {
+            isSessionLocked = false;
+            uiElements.lockToggle.checked = false;
+            isTestMode = false;
+            uiElements.testModeToggle.checked = false;
+            uiElements.body.classList.remove('test-mode-active');
+            showCreateView(true);
+        }
+
+        // --- Game State ---
+        let shuffledVerbs = [];
+        let currentIndex = 0;
+        let totalAttempts = 0;
+        let totalCorrect = 0;
+        let testModeScore = 0;
+        let testModeMistakes = [];
+        let currentStreak = 0;
+        let correctionMode = false;
+        let isSessionLocked = false;
+        let isEndlessMode = false;
+        let isTestMode = false;
+
+        const uiElements = {
+            body: document.getElementById('app-body'),
+            word: document.getElementById('term-display'),
+            input: document.getElementById('answer-input'),
+            submit: document.getElementById('submit-btn'),
+            feedback: document.getElementById('feedback'),
+            score: document.getElementById('score-counter'),
+            progress: document.getElementById('progress-text'),
+            card: document.getElementById('game-card'),
+            badge: document.getElementById('mode-badge'),
+            instr: document.getElementById('instruction-text'),
+            missedList: document.getElementById('missed-list'),
+            masteredList: document.getElementById('mastered-list'),
+            btnText: document.getElementById('btn-text'),
+            quizUI: document.getElementById('quiz-ui'),
+            endUI: document.getElementById('end-ui'),
+            statsUI: document.getElementById('stats-ui'),
+            statsTable: document.getElementById('stats-table-body'),
+            missedCount: document.getElementById('missed-count'),
+            masteredCount: document.getElementById('mastered-count'),
+            lockToggle: document.getElementById('lock-toggle'),
+            endlessToggle: document.getElementById('endless-toggle'),
+            testModeToggle: document.getElementById('test-mode-toggle'),
+            restartBtn: document.getElementById('restart-btn'),
+            lockNotice: document.getElementById('lock-notice'),
+            lockIcon: document.getElementById('lock-icon'),
+            streakDisplay: document.getElementById('streak-display'),
+            highStreakDisplay: document.getElementById('high-streak-display'),
+            endStatsBtn: document.getElementById('end-settings-btn'),
+            viewStatsBtn: document.getElementById('view-settings-btn'),
+            settingsBtnLabel: document.getElementById('settings-btn-label'),
+            clearStatsBtn: document.getElementById('clear-stats-btn'),
+            tooltip: document.getElementById('custom-tooltip'),
+            modalOverlay: document.getElementById('modal-overlay'),
+            modalTitle: document.getElementById('modal-title'),
+            modalBody: document.getElementById('modal-body'),
+            modalCancel: document.getElementById('modal-cancel'),
+            modalConfirm: document.getElementById('modal-confirm'),
+            endMessage: document.getElementById('end-message'),
+            testMistakesContainer: document.getElementById('test-mistakes-container')
+        };
+
+        function showModal(title, body, onConfirm) {
+            uiElements.modalTitle.innerText = title;
+            uiElements.modalBody.innerText = body;
+            uiElements.modalOverlay.classList.remove('hidden');
+            uiElements.modalOverlay.classList.add('flex');
+            
+            const handleConfirm = () => {
+                onConfirm();
+                closeModal();
+                uiElements.modalConfirm.onclick = null;
+            };
+            
+            const handleCancel = () => {
+                closeModal();
+                uiElements.modalConfirm.onclick = null;
+            };
+            
+            uiElements.modalConfirm.onclick = handleConfirm;
+            uiElements.modalCancel.onclick = handleCancel;
+        }
+
+        function closeModal() {
+            uiElements.modalOverlay.classList.add('hidden');
+            uiElements.modalOverlay.classList.remove('flex');
+        }
+
+        function initDeck() {
+            shuffledVerbs = currentSet.words.map(v => ({ ...v, everMissed: false })).sort(() => Math.random() - 0.5);
+            currentIndex = 0;
+            totalAttempts = 0;
+            totalCorrect = 0;
+            testModeScore = 0;
+            testModeMistakes = [];
+            currentStreak = 0;
+            correctionMode = false;
+            uiElements.missedList.innerHTML = "";
+            uiElements.masteredList.innerHTML = "";
+            uiElements.missedCount.innerText = "0";
+            uiElements.masteredCount.innerText = "0";
+            uiElements.quizUI.classList.remove('hidden');
+            uiElements.endUI.classList.add('hidden');
+            uiElements.statsUI.classList.add('hidden');
+            uiElements.testMistakesContainer.classList.add('hidden');
+            uiElements.testMistakesContainer.innerHTML = '';
+            uiElements.input.style.display = 'block';
+            uiElements.settingsBtnLabel.innerText = "Settings";
+            updateAccuracyDisplay();
+            updateStreakDisplay();
+            if(shuffledVerbs.length > 0) loadWord();
+        }
+
+        function updateAccuracyDisplay() {
+            const accuracy = totalAttempts > 0 ? Math.round((totalCorrect / totalAttempts) * 100) : 0;
+            uiElements.score.innerText = `Accuracy: ${accuracy}%`;
+        }
+
+        function updateStreakDisplay() {
+            uiElements.streakDisplay.innerText = `Streak: ${currentStreak}`;
+            uiElements.highStreakDisplay.innerText = `Highest Streak: ${pooledStats.highestStreak || 0}`;
+            uiElements.streakDisplay.classList.toggle('hidden', !isEndlessMode);
+        }
+
+        function updateHistory(term, meaning, isCorrect) {
+            if (isTestMode) return;
+            const existing = document.querySelector(`[data-term="${term}"]`);
+            if (existing && !isCorrect) return; 
+            if (isCorrect && existing) return; 
+
+            const div = document.createElement('div');
+            div.setAttribute('data-term', term);
+            div.className = `list-item p-3 rounded-xl text-sm font-semibold border ${isCorrect ? 'bg-green-50 border-green-100 text-green-700' : 'bg-red-50 border-red-100 text-red-700'} flex justify-between items-center`;
+            div.innerHTML = `<span>${term}</span> <span class="opacity-60 font-normal">${meaning}</span>`;
+            
+            if (isCorrect) uiElements.masteredList.prepend(div);
+            else uiElements.missedList.prepend(div);
+            refreshCounts();
+        }
+
+        function refreshCounts() {
+            uiElements.masteredCount.innerText = uiElements.masteredList.children.length;
+            uiElements.missedCount.innerText = uiElements.missedList.children.length;
+        }
+
+        function toggleBlurs(currentTerm) {
+            if (isTestMode) return;
+            document.querySelectorAll('.list-item').forEach(el => el.classList.remove('blurred'));
+            const missedItem = document.querySelector(`#missed-list [data-term="${currentTerm}"]`);
+            if (missedItem) missedItem.classList.add('blurred');
+            const masteredItem = document.querySelector(`#mastered-list [data-term="${currentTerm}"]`);
+            if (masteredItem) masteredItem.classList.add('blurred');
+        }
+
+        function renderStatsTable() {
+            const currentTerms = currentSet.words.map(w => w.term);
+            const sortedKeys = currentTerms.sort((a,b) => {
+                const sA = pooledStats.verbs[a] || {correct:0, incorrect:0};
+                const sB = pooledStats.verbs[b] || {correct:0, incorrect:0};
+                const totalA = sA.correct + sA.incorrect;
+                const totalB = sB.correct + sB.incorrect;
+                return (totalA > 0 ? sA.correct/totalA : 0) - (totalB > 0 ? sB.correct/totalB : 0); 
+            });
+
+            uiElements.statsTable.innerHTML = sortedKeys.map(term => {
+                const data = pooledStats.verbs[term] || { correct: 0, incorrect: 0 };
+                const total = data.correct + data.incorrect;
+                const rate = total > 0 ? Math.round((data.correct / total) * 100) : 0;
+                return `
+                    <tr class="border-b border-slate-50 last:border-0">
+                        <td class="py-3 font-bold text-slate-800">${term}</td>
+                        <td class="py-3 text-center text-green-500 font-bold">${data.correct}</td>
+                        <td class="py-3 text-center text-red-400 font-bold">${data.incorrect}</td>
+                        <td class="py-3 text-right font-black ${rate > 80 ? 'text-indigo-600' : 'text-slate-400'}">${rate}%</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function loadWord() {
+            const finished = currentIndex >= shuffledVerbs.length;
+            if (finished) {
+                if (isEndlessMode) {
+                    shuffledVerbs = currentSet.words.map(v => ({ ...v, everMissed: false })).sort(() => Math.random() - 0.5);
+                    currentIndex = 0;
+                } else {
+                    showEndUI();
+                    return;
+                }
+            }
+
+            const current = shuffledVerbs[currentIndex];
+            if (!isTestMode) toggleBlurs(current.term);
+
+            uiElements.word.innerText = current.term;
+            uiElements.input.value = "";
+            uiElements.input.placeholder = "Type meaning...";
+            uiElements.input.style.height = 'auto'; // Reset textarea height
+            uiElements.input.focus();
+            
+            uiElements.badge.innerText = isTestMode ? "Test Evaluation" : (current.everMissed ? "Review Attempt" : "First Attempt");
+            uiElements.badge.className = isTestMode ? "px-3 py-1 bg-slate-900 text-white text-[10px] font-bold uppercase rounded-full tracking-wider" : (current.everMissed 
+                ? "px-3 py-1 bg-red-100 text-red-700 text-[10px] font-bold uppercase rounded-full tracking-wider"
+                : "px-3 py-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold uppercase rounded-full tracking-wider");
+            
+            uiElements.instr.innerText = "Translate to English";
+            uiElements.instr.className = "text-slate-400 text-sm font-medium";
+            uiElements.progress.innerText = `Word ${currentIndex + 1}/${shuffledVerbs.length}`;
+            uiElements.feedback.className = "mt-6 text-center min-h-[1.5rem] font-bold text-sm transition-opacity duration-300 opacity-0";
+            uiElements.card.className = "bg-white p-8 rounded-3xl shadow-xl transition-all duration-300 border border-slate-100";
+            uiElements.btnText.innerText = "Confirm Answer";
+        }
+
+        function showEndUI() {
+            uiElements.quizUI.classList.add('hidden');
+            uiElements.statsUI.classList.add('hidden');
+            uiElements.endUI.classList.remove('hidden');
+            
+            if (isTestMode) {
+                uiElements.endMessage.innerHTML = `<span class="block text-2xl font-bold text-indigo-600 mb-2">Final Score: ${testModeScore}/${shuffledVerbs.length}</span> Mastered the basics.`;
+                
+                if (testModeMistakes.length > 0) {
+                    let mistakesHTML = `<h4 class="font-bold text-slate-700 mb-3 text-sm">Review Mistakes:</h4><ul class="space-y-3">`;
+                    testModeMistakes.forEach(m => {
+                        mistakesHTML += `
+                            <li class="bg-white p-3 rounded-lg shadow-sm border border-slate-200 text-sm">
+                                <div class="font-bold text-slate-800 mb-1">${m.term}</div>
+                                <div class="flex flex-col gap-1 text-xs">
+                                    <div class="text-red-500"><span class="font-semibold">You wrote:</span> ${m.userAnswer}</div>
+                                    <div class="text-green-600"><span class="font-semibold">Correct:</span> ${m.correctAnswers}</div>
+                                </div>
+                            </li>
+                        `;
+                    });
+                    mistakesHTML += `</ul>`;
+                    uiElements.testMistakesContainer.innerHTML = mistakesHTML;
+                    uiElements.testMistakesContainer.classList.remove('hidden');
+                } else {
+                    uiElements.testMistakesContainer.innerHTML = `<div class="text-green-600 font-bold text-center py-4">Perfect score! No mistakes to review.</div>`;
+                    uiElements.testMistakesContainer.classList.remove('hidden');
+                }
+
+            } else {
+                uiElements.endMessage.innerText = "You've reached the end of the session.";
+                uiElements.testMistakesContainer.classList.add('hidden');
+            }
+        }
+
+        function toggleSettings() {
+            if (!uiElements.statsUI.classList.contains('hidden')) {
+                uiElements.statsUI.classList.add('hidden');
+                uiElements.settingsBtnLabel.innerText = "Settings";
+                if (currentIndex < shuffledVerbs.length) uiElements.quizUI.classList.remove('hidden');
+                else uiElements.endUI.classList.remove('hidden');
+            } else {
+                showStatsUI();
+            }
+        }
+
+        function showStatsUI() {
+            uiElements.quizUI.classList.add('hidden');
+            uiElements.endUI.classList.add('hidden');
+            uiElements.statsUI.classList.remove('hidden');
+            uiElements.settingsBtnLabel.innerText = "Back to Trainer";
+            
+            const finished = currentIndex >= shuffledVerbs.length;
+            if (isSessionLocked && !finished) {
+                uiElements.restartBtn.disabled = true;
+                uiElements.lockToggle.disabled = true;
+                uiElements.lockNotice.classList.remove('hidden');
+            } else {
+                uiElements.restartBtn.disabled = false;
+                uiElements.lockToggle.disabled = false;
+                uiElements.lockNotice.classList.add('hidden');
+                if (finished) {
+                    isSessionLocked = false;
+                    uiElements.lockToggle.checked = false;
+                    isTestMode = false;
+                    uiElements.testModeToggle.checked = false;
+                    uiElements.body.classList.remove('test-mode-active');
+                    uiElements.lockIcon.classList.add('hidden');
+                }
+            }
+            updateStreakDisplay();
+            renderStatsTable();
+        }
+
+        function checkAnswer() {
+            if (currentIndex >= shuffledVerbs.length && !isEndlessMode) return;
+            const userAnswer = uiElements.input.value.trim().toLowerCase();
+            const currentObj = shuffledVerbs[currentIndex];
+            const primaryMeaning = currentObj.meanings[0];
+
+            if (correctionMode && !isTestMode) {
+                if (currentObj.meanings.some(m => userAnswer === m)) {
+                    correctionMode = false;
+                    const wordToMove = shuffledVerbs.splice(currentIndex, 1)[0];
+                    if (shuffledVerbs.length > currentIndex) {
+                        const targetIndex = Math.floor(Math.random() * (shuffledVerbs.length - (currentIndex + 1) + 1)) + (currentIndex + 1);
+                        shuffledVerbs.splice(targetIndex, 0, wordToMove);
+                    } else shuffledVerbs.push(wordToMove);
+                    loadWord();
+                } else {
+                    uiElements.input.value = "";
+                    uiElements.card.classList.add('wrong-flash');
+                    setTimeout(() => uiElements.card.classList.remove('wrong-flash'), 500);
+                }
+                return;
+            }
+
+            const isCorrect = currentObj.meanings.some(m => userAnswer === m || (userAnswer.includes(m) && m.length > 3));
+
+            if (isTestMode) {
+                if (isCorrect) {
+                    testModeScore++;
+                } else {
+                    testModeMistakes.push({
+                        term: currentObj.term,
+                        userAnswer: userAnswer || "(blank)",
+                        correctAnswers: currentObj.meanings.join(', ')
+                    });
+                }
+                currentIndex++;
+                loadWord();
+                return;
+            }
+
+            totalAttempts++;
+            if (isCorrect) {
+                totalCorrect++;
+                currentStreak++;
+                recordAttempt(currentObj.term, true, currentStreak);
+                if (!currentObj.everMissed) updateHistory(currentObj.term, primaryMeaning, true);
+                showFeedback("Correct!", "text-green-600");
+                uiElements.card.classList.add('correct-flash');
+                setTimeout(() => {
+                    uiElements.card.classList.remove('correct-flash');
+                    currentIndex++;
+                    loadWord();
+                }, 600);
+            } else {
+                currentStreak = 0;
+                recordAttempt(currentObj.term, false, currentStreak);
+                if (isEndlessMode) {
+                    const masteredItem = document.querySelector(`#mastered-list [data-term="${currentObj.term}"]`);
+                    if (masteredItem) masteredItem.remove();
+                }
+                currentObj.everMissed = true;
+                correctionMode = true;
+                updateHistory(currentObj.term, primaryMeaning, false);
+                uiElements.badge.innerText = "Correction Needed";
+                uiElements.badge.className = "px-3 py-1 bg-amber-100 text-amber-700 text-[10px] font-bold uppercase rounded-full tracking-wider";
+                uiElements.instr.innerText = `Type: ${primaryMeaning}`;
+                uiElements.instr.className = "text-amber-600 text-sm font-bold";
+                uiElements.input.value = "";
+                uiElements.input.placeholder = `Correction: ${primaryMeaning}`;
+                uiElements.input.style.height = 'auto'; // Reset on correction
+                uiElements.btnText.innerText = "Confirm";
+                uiElements.card.classList.add('wrong-flash');
+                setTimeout(() => uiElements.card.classList.remove('wrong-flash'), 500);
+            }
+            updateAccuracyDisplay();
+            updateStreakDisplay();
+        }
+
+        function showFeedback(text, colorClass) {
+            if (isTestMode) return;
+            uiElements.feedback.innerText = text;
+            uiElements.feedback.className = `mt-6 text-center min-h-[1.5rem] font-bold text-sm transition-opacity duration-300 opacity-100 ${colorClass}`;
+        }
+
+        let tooltipTimer;
+        document.querySelectorAll('.tooltip-trigger').forEach(trigger => {
+            trigger.addEventListener('mouseenter', (e) => {
+                // If it's the title, ONLY show tooltip if the text is truncated
+                if (trigger.id === 'active-set-title') {
+                    if (trigger.scrollWidth <= trigger.clientWidth) return;
+                }
+
+                const tipText = trigger.getAttribute('data-tip');
+                tooltipTimer = setTimeout(() => {
+                    uiElements.tooltip.innerText = tipText;
+                    uiElements.tooltip.classList.remove('hidden');
+                    uiElements.tooltip.classList.add('opacity-100');
+                }, 400); 
+            });
+            trigger.addEventListener('mousemove', (e) => {
+                uiElements.tooltip.style.left = (e.clientX + 15) + 'px';
+                uiElements.tooltip.style.top = (e.clientY + 15) + 'px';
+            });
+            trigger.addEventListener('mouseleave', () => {
+                clearTimeout(tooltipTimer);
+                uiElements.tooltip.classList.add('hidden', 'opacity-0');
+            });
+        });
+
+        uiElements.submit.addEventListener('click', checkAnswer);
+        uiElements.input.addEventListener('keydown', (e) => { 
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); // Prevent newline insertion
+                checkAnswer(); 
+            }
+        });
+        uiElements.viewStatsBtn.addEventListener('click', toggleSettings);
+        uiElements.endStatsBtn.addEventListener('click', showStatsUI);
+        
+        uiElements.lockToggle.addEventListener('change', (e) => {
+            isSessionLocked = e.target.checked;
+            uiElements.lockIcon.classList.toggle('hidden', !isSessionLocked);
+        });
+
+        uiElements.endlessToggle.addEventListener('change', (e) => {
+            if (e.target.checked && isTestMode) {
+                e.target.checked = false;
+                showModal("Error", "Endless Mode cannot be enabled while Test Mode is active.", () => {});
+                return;
+            }
+            isEndlessMode = e.target.checked;
+            updateStreakDisplay();
+        });
+
+        uiElements.testModeToggle.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                showModal("Start Test?", "Test Mode hides all aids, disables feedback, and locks the session. Your final score will be revealed at the end. The session will restart now.", () => {
+                    isTestMode = true;
+                    isSessionLocked = true;
+                    isEndlessMode = false;
+                    uiElements.lockToggle.checked = true;
+                    uiElements.endlessToggle.checked = false;
+                    uiElements.lockIcon.classList.remove('hidden');
+                    uiElements.body.classList.add('test-mode-active');
+                    initDeck(); 
+                });
+                e.target.checked = isTestMode; 
+            } else {
+                isTestMode = false;
+                uiElements.body.classList.remove('test-mode-active');
+            }
+        });
+
+        uiElements.restartBtn.addEventListener('click', () => {
+            if (isSessionLocked && currentIndex < shuffledVerbs.length) return;
+            initDeck();
+        });
+
+        uiElements.clearStatsBtn.addEventListener('click', () => {
+            showModal("Reset Data?", "This will clear all historical hits, misses, and your record streak. This cannot be undone.", () => {
+                pooledStats = { verbs: {}, highestStreak: 0 };
+                saveStats();
+                renderStatsTable();
+                updateStreakDisplay();
+            });
+        });
+
+    </script>
+</body>
+</html>
